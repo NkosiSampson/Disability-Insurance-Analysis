@@ -126,6 +126,8 @@ with tabs[0]:
         "Total premiums by age 65": ["—"] + [money(r["lifetime_premiums"]) for r in res],
         "Bad case: 1 in 20 loses more than": [money(np.quantile(x, .95)) for x in losses],
         "Severe case: 1 in 100 loses more than": [money(np.quantile(x, .99)) for x in losses],
+        "Very severe case: 1 in 200 loses more than": [money(np.quantile(x, .995)) for x in losses],
+        "Extreme case: 1 in 2,000 loses more than": [money(np.quantile(x, .9995)) for x in losses],
     }
     st.table(pd.DataFrame(rows, index=NAMES).T)
     st.caption("Expected values are in today's dollars. Loss = income lost − SDI − benefits + premiums, by age 65.")
