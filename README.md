@@ -15,6 +15,9 @@ The result is not a recommendation. Every policy pays back about 60 cents per pr
 | `app.py` | The interactive dashboard (Streamlit) |
 | `disability_model.py` | The simulation model, with the fitted SOA coefficients built in |
 | `requirements.txt` | Python packages the app needs |
+| `read_idec_pivot.py` | Decodes the raw records hidden inside the SOA pivot files |
+| `fit_incidence.py` | Fits the claim incidence model (how often claims start) |
+| `fit_termination.py` | Fits the claim termination models (recovery and death) |
 
 ## Run it yourself
 
@@ -23,11 +26,65 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Data sources
+The app does not need the raw data. The fitted coefficients are already stored in `disability_model.py`. You only need the data below if you want to refit the models and check the numbers yourself.
 
-- Society of Actuaries, IDEC claim incidence study, 2006–2015
-- Society of Actuaries, IDEC claim termination study, 2006–2015
-- Social Security Administration, Actuarial Note 2026.6
-- California EDD, 2026 State Disability Insurance rules
+## Data: where it comes from and how to get it
+
+### 1. SOA claim incidence data (how often claims start)
+
+- Study page: [Analysis of Claim Incidence Experience from 2006 to 2014](https://www.soa.org/resources/experience-studies/2019/claim-incidence-report/)
+- Data file (about 315 MB): [idec-incidence-table.xlsb](https://cdn-files.soa.org/web/research/idec-incidence-table.xlsb)
+- Report: [IDEC 2006–2014 Claim Incidence Report (PDF)](https://www.soa.org/globalassets/assets/files/resources/experience-studies/2019/2006-14-idec-incidence-report.pdf)
+
+### 2. SOA claim termination data (how long claims last)
+
+- Study page: [Analysis of Claim Termination Experience from 2006 to 2014](https://www.soa.org/resources/experience-studies/2021/analysis-claim-termination/)
+- Data file (about 300 MB): [idec-2006-15-ct-pivot.xlsb](https://www.soa.org/globalassets/assets/files/resources/experience-studies/2022/idec-2006-15-ct-pivot.xlsb)
+- Report: [IDEC 2006–2014 Claim Termination Report (PDF)](https://www.soa.org/globalassets/assets/files/resources/experience-studies/2021/analysis-claim-termination-report.pdf)
+
+The SOA study pages describe 2006–2014, but the termination file's name says 2006–15, so this project refers to the data as 2006–2015.
+
+Both files are free to download, but they are too large to store on GitHub, so they are not in this repo.
+
+**Why a special reader is needed:** opening these files in Excel, pandas or pyxlsb only shows a summary pivot table. The individual records are stored inside the file's pivot cache, a binary part of the `.xlsb` file. `read_idec_pivot.py` reads that part directly and returns every record as a pandas DataFrame.
+
+**Note:** this is data on people who bought individual disability insurance. It describes insured, mostly professional workers, not the general population.
+
+### 3. Social Security mortality and disability rates
+
+- [SSA Actuarial Note 2026.6 (PDF)](https://www.ssa.gov/oact/NOTES/ran6/an2026-6.pdf): death rates for healthy workers by age and sex, used for the chance of dying before 65 while not disabled.
+
+### 4. California State Disability Insurance (SDI)
+
+- [EDD: Disability Insurance benefit payment amounts](https://edd.ca.gov/en/Disability/Calculating_DI_Benefit_Payment_Amounts)
+- [EDD: 2026 maximum weekly benefit amount (PDF)](https://edd.ca.gov/siteassets/files/about_edd/quick-stats/max-weekly-benefit-amount-2026.pdf)
+
+The model uses the 2026 rules: 90% of weekly wages up to $1,252.30, otherwise 70%, capped at $1,765 a week, after a 7-day wait, for up to 52 weeks.
+
+## Refit the models from the raw data
+
+1. Download the two `.xlsb` files above and put them in the same folder as the scripts.
+2. Install the packages: `pip install numpy pandas statsmodels matplotlib`
+3. Check that the data loads:
+   ```
+   python read_idec_pivot.py idec-incidence-table.xlsb
+   python read_idec_pivot.py idec-2006-15-ct-pivot.xlsb
+   ```
+   Each command writes a CSV with every record and prints totals you can compare with the SOA report.
+4. Fit the models:
+   ```
+   python fit_incidence.py
+   python fit_termination.py
+   ```
+   Each script prints the rate ratios with confidence intervals and saves them to CSV, along with a chart.
+
+You can also use the reader in your own code:
+
+```python
+from read_idec_pivot import load_idec
+df = load_idec("idec-incidence-table.xlsb")
+```
+
+Each file needs several GB of memory to load in full, so use a machine or Colab runtime with plenty of RAM. In Google Colab, upload the `.xlsb` file and the scripts through the Files panel, then run `%run fit_incidence.py`.
 
 Built in Python with numpy, pandas, statsmodels, and Streamlit. This is an educational model, not financial advice.
