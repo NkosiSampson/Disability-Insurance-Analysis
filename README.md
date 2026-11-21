@@ -2,9 +2,11 @@
 
 Which disability insurance policy, if any, is worth buying given your own risk factors? This project answers that with a simulation grounded in real insurance data rather than rules of thumb.
 
-I decoded the raw records hidden inside the Society of Actuaries' 2006–2015 individual disability studies (about 7 million records in total) and fitted Poisson regression models to them: one for how often disability claims start (25.4 million policy-years, 148,000 claims) and two for how long they last, through recovery or death (762,000 claim-years). Those models drive a simulation of 50,000 working lives, month by month from your current age to 65, including California SDI, Social Security disability, and your expected income growth.
+I decoded the raw records hidden inside the Society of Actuaries' 2006–2015 individual disability studies (about 7 million records in total) and fitted Poisson regression models to them: one for how often disability claims start (25.4 million policy-years, 148,000 claims) and two for how long they last, through recovery or death (762,000 claim-years). Those models drive a simulation of 50,000 working lives, month by month from your current age to 65, including California SDI, Social Security disability, taxes, and your expected income growth.
 
 For each policy you set up (waiting period, benefit period, benefit percentage, premium, and a future increase option), the dashboard shows the chance it pays out, expected cost versus expected benefits, worst-case losses, and how likely a disability is to leave you below the income you need to support yourself, and for how long.
+
+Losses are counted in take-home pay by default. A disability takes away your pay after taxes, while policy benefits (when you pay the premiums yourself), SDI and SSDI are tax-free, so a benefit of 60% of your pre-tax income replaces roughly 80% of what you actually take home. A switch in the app shows everything before taxes instead.
 
 The result is not a recommendation. Every policy pays back about 60 cents per premium dollar on average, so the tool lays out what that cost buys in protection and leaves the decision to you.
 
@@ -60,6 +62,14 @@ Both files are free to download, but they are too large to store on GitHub, so t
 - [EDD: 2026 maximum weekly benefit amount (PDF)](https://edd.ca.gov/siteassets/files/about_edd/quick-stats/max-weekly-benefit-amount-2026.pdf)
 
 The model uses the 2026 rules: 90% of weekly wages up to $1,252.30, otherwise 70%, capped at $1,765 a week, after a 7-day wait, for up to 52 weeks.
+
+### 5. 2026 taxes (for take-home pay)
+
+- [IRS: 2026 tax brackets and standard deduction](https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill)
+- [California FTB: 2026 tax rate schedule and standard deduction](https://www.ftb.ca.gov/about-ftb/newsroom/tax-news/2026/10.html)
+- [CalChamber: 2026 Social Security wage base and California SDI payroll rate](https://hrcalifornia.calchamber.com/articles/2026-social-security-taxable-wage-base-california-sdi-withholding-rate-increase)
+
+The model assumes a single filer taking the standard deduction: federal income tax, Social Security (6.2% up to $184,500), Medicare (1.45%, plus 0.9% over $200,000), California income tax and the 1.3% California SDI payroll tax. Outside California, no state income tax is assumed. On $95,000 in California this gives about $70,000 of take-home pay.
 
 ## Refit the models from the raw data
 

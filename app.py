@@ -80,12 +80,19 @@ with st.sidebar:
         rate = st.slider("Discount rate (after inflation)", 0.0, 6.0, 3.0, 0.5, format="%.1f%%")
         payout = st.slider("Insurer payout ratio for estimated premiums", 40, 85, 60, 5, format="%d%%",
                            help="Share of premiums the insurer expects to pay back as benefits.")
+        after_tax = st.checkbox("Count income after taxes (take-home pay)", value=True,
+                                help="A disability takes away your take-home pay, not your pre-tax salary. "
+                                     "Policy benefits (when you pay the premiums yourself), SDI and SSDI are "
+                                     "tax-free, so this compares like with like. Uses 2026 federal, Social "
+                                     "Security/Medicare and California taxes for a single filer. Uncheck to "
+                                     "count everything before taxes.")
 
 p = Person(age=age, sex="f" if sex == "Female" else "m", income=income, occ_class=occ, smoker=smoker, bmi=bmi,
            chronic=chronic, hobby=hobby, california=california, income_path=path,
-           discount_rate=rate, payout_ratio=payout)
+           discount_rate=rate, payout_ratio=payout, after_tax=after_tax)
 
 st.title("What a disability could cost you")
+BASIS = "take-home" if after_tax else "pre-tax"
 tabs = st.tabs(["Policies", "Financial burden", "Worst cases", "Your baseline risk", "Where the numbers come from"])
 
 # ------------------------------------------------------------------ policies (inputs first: they feed every tab)
@@ -130,14 +137,16 @@ with tabs[0]:
         "Extreme case: 1 in 2,000 loses more than": [money(np.quantile(x, .9995)) for x in losses],
     }
     st.table(pd.DataFrame(rows, index=NAMES).T)
-    st.caption("Expected values are in today's dollars. Loss = income lost − SDI − benefits + premiums, by age 65.")
+    st.caption(("Income lost is take-home pay (after 2026 taxes); benefits and SDI are tax-free. " if after_tax else
+                "Everything is counted before taxes. ")
+               + "Expected values are in today's dollars. Loss = income lost − SDI − benefits + premiums, by age 65.")
 
 # ------------------------------------------------------------------ financial burden
 with tabs[1]:
     st.caption("Set the yearly income you need to support yourself. If a disability leaves you living on less "
                "than that, this counts it as time spent as a financial burden.")
     c1, c2, c3, c4 = st.columns(4)
-    floor = c1.slider("Income you need each year", 20_000, 150_000, 50_000, 5_000, format="$%d")
+    floor = c1.slider("Take-home income you need each year" if after_tax else "Income you need each year", 20_000, 150_000, 50_000, 5_000, format="$%d")
     min_yr = c2.slider("Being a burden for more than (years)", 0.5, 20.0, 1.0, 0.5, format="%.1f")
     ssdi = c3.slider("SSDI you'd get if approved, per year", 0, 45_000, 18_000, 1_000, format="$%d")
     ssdi_p = c4.slider("Chance Social Security approves", 0, 100, 50, 5, format="%d%%") / 100
@@ -193,7 +202,7 @@ with tabs[1]:
         "Total premiums by age 65": ["—"] + [money(r["lifetime_premiums"]) for r in res],
     }, index=NAMES).T)
     st.caption("While disabled, your income is SDI (weeks 2–52, in California), plus SSDI if Social Security approves "
-               "you, plus any policy benefits. Averages include the many people who never get disabled.")
+               "you, plus any policy benefits, all tax-free. Averages include the many people who never get disabled.")
 
 # ------------------------------------------------------------------ worst cases
 with tabs[2]:
@@ -217,7 +226,7 @@ with tabs[2]:
                        for i, l in enumerate(losses) for x in grid if exceed(l, x) >= 0.001])
     chart = alt.Chart(df).mark_line(strokeWidth=2.5).encode(
         x=alt.X("Total loss by 65:Q", scale=alt.Scale(type="log", domain=[5_000, float(grid[-1])], nice=False), axis=alt.Axis(format="$,.2~s"),
-                title="Total loss by age 65, in today's dollars"),
+                title=f"Total loss by age 65, in today's dollars ({BASIS})"),
         y=alt.Y("Chance of losing more:Q", scale=alt.Scale(type="log", domain=[0.001, 1]),
                 axis=alt.Axis(format="%"), title="Chance of losing more than this"),
         color=alt.Color("Option:N", scale=alt.Scale(domain=NAMES, range=COLORS)),
@@ -237,7 +246,7 @@ with tabs[3]:
     c[1].metric("Lasting over 3 months", f"{b['p3']:.0%}")
     c[2].metric("Lasting over a year", f"{b['p12']:.1%}")
     c = st.columns(3)
-    c[0].metric("Expected income lost", money(b["exp_lost"]))
+    c[0].metric("Expected take-home pay lost" if after_tax else "Expected income lost", money(b["exp_lost"]))
     c[1].metric("Share of that SDI replaces", f"{b['exp_sdi']/b['exp_lost']:.0%}" if b["exp_lost"] else "—")
     c[2].metric("Worst 1 in 100 without a policy", money(np.quantile(b["loss"], .99)))
 
@@ -254,6 +263,10 @@ disability that lasts over 30 days. Every policy is applied to the same lives.
   study (762,000 claim-years), by time on claim, onset age, sex, occupation class, benefit size and a diagnosis
   drawn from the real claim mix.
 - **Deaths while healthy:** SSA Actuarial Note 2026.6. **SDI:** 2026 California rules.
+- **Taxes:** with "Count income after taxes" on (the default), income lost is take-home pay after 2026 federal
+  income tax, Social Security and Medicare, and California income tax and SDI payroll tax, for a single filer with
+  the standard deduction. Policy benefits are a percentage of pre-tax income but are tax-free when you pay the
+  premiums yourself, as are SDI and (at these amounts) SSDI. Employer-paid policies would be taxable.
 - **Assumptions:** BMI multipliers, chronic condition (1.5×), hobbies (1.15×), the 15% income-growth default,
   and the 60% payout ratio behind estimated premiums.
 

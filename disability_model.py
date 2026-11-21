@@ -11,9 +11,12 @@ Data (see the notebooks for how the models were fitted):
   INC  Poisson model of how often claims start (SOA IDEC claim incidence study, 2006-2015)
   GLM  Poisson models of recovery and death while disabled (SOA IDEC claim termination study)
   SSA  healthy-worker mortality by age and sex (SSA Actuarial Note 2026.6)
+  TAX  2026 federal, Social Security/Medicare and California income taxes (single filer),
+       used to turn income into take-home pay
 Only numpy is required.
 """
 from dataclasses import dataclass, field
+from typing import Optional
 import json
 import math
 import numpy as np
@@ -31,6 +34,17 @@ LT_BANDS = [(6, "4-6m"), (12, "7-12m"), (24, "13-24m"), (36, "25-36m"), (60, "37
 ELIM_OPTIONS = {1: "30 days", 2: "60 days", 3: "90 days", 6: "180 days", 12: "365 days", 24: "2 years"}
 BENEFIT_PERIODS = {12: "1 year", 24: "2 years", 60: "5 years", 120: "10 years", None: "To age 65"}
 
+# 2026 taxes, single filer (IRS Rev. Proc. 2025-32; FTB 2026 Schedule X; SSA wage base; EDD SDI rate)
+FED_STD = 16_100
+FED_BRACKETS = [(12_400, .10), (50_400, .12), (105_700, .22), (201_775, .24), (256_225, .32), (640_600, .35),
+                (math.inf, .37)]
+SS_RATE, SS_WAGE_BASE = 0.062, 184_500
+MEDICARE_RATE, MEDICARE_EXTRA, MEDICARE_EXTRA_OVER = 0.0145, 0.009, 200_000
+CA_STD, CA_CREDIT = 5_900, 158
+CA_BRACKETS = [(11_456, .01), (27_157, .02), (42_861, .04), (59_498, .06), (75_197, .08), (384_109, .093),
+               (460_927, .103), (768_213, .113), (1_000_000, .123), (math.inf, .133)]   # incl. 1% over $1M
+CA_SDI_RATE = 0.013                                 # employee SDI payroll tax, no wage cap
+
 
 # ---------------------------------------------------------------- inputs
 @dataclass
@@ -47,14 +61,15 @@ class Person:
     income_path: dict = field(default_factory=dict)   # {age: expected income}, e.g. {30: 115000, 40: 155000}
     discount_rate: float = 3.0     # % a year, after inflation
     payout_ratio: float = 60.0     # % of premiums insurers pay back (for estimated premiums)
+    after_tax: bool = True         # count lost income as take-home pay (benefits, SDI and SSDI are tax-free)
 
 
 @dataclass
 class Policy:
     elim_months: int = 3           # waiting period: 1, 2, 3, 6, 12 or 24 months
-    benefit_months: int | None = None   # None = to age 65
+    benefit_months: Optional[int] = None   # None = to age 65
     benefit_pct: float = 60.0      # % of income
-    premium: float | None = None   # monthly premium; None = estimate from the model
+    premium: Optional[float] = None   # monthly premium; None = estimate from the model
     sdi_offset: bool = False       # benefit reduced by SDI (typical of group policies)
     future_increase: bool = False  # coverage (and premium) grows with income
 
@@ -86,6 +101,30 @@ def benefit_band(monthly):
 def sdi_monthly(income):
     wk = income / 52
     return min(SDI_CAP, (0.9 if wk <= SDI_90_LIMIT else 0.7) * wk) * 52 / 12
+
+def _bracket_tax(x, brackets):
+    tax, lo = 0.0, 0.0
+    for hi, rate in brackets:
+        if x <= lo:
+            break
+        tax += (min(x, hi) - lo) * rate
+        lo = hi
+    return tax
+
+def income_taxes(gross, california=True):
+    """2026 taxes on a year's wages for a single filer with the standard deduction."""
+    federal = _bracket_tax(max(0.0, gross - FED_STD), FED_BRACKETS)
+    fica = (SS_RATE * min(gross, SS_WAGE_BASE) + MEDICARE_RATE * gross
+            + MEDICARE_EXTRA * max(0.0, gross - MEDICARE_EXTRA_OVER))
+    state = 0.0
+    if california:
+        state = max(0.0, _bracket_tax(max(0.0, gross - CA_STD), CA_BRACKETS) - CA_CREDIT) + CA_SDI_RATE * gross
+    return federal + fica + state
+
+def take_home(gross, california=True):
+    """Yearly take-home pay after 2026 federal, Social Security/Medicare and (optionally) California taxes.
+    Outside California no state income tax is assumed."""
+    return gross - income_taxes(gross, california)
 
 def default_income_path(age, income):
     """About 15% growth every 5 years until 50, then flat (an assumption; override it)."""
@@ -193,20 +232,26 @@ def simulate(p: Person, n=N_LIVES, seed=SEED):
 
 # ---------------------------------------------------------------- money
 class Money:
-    """Income path, SDI and discounting over the simulation horizon."""
+    """Income path, SDI and discounting over the simulation horizon.
+
+    gross: monthly pre-tax income (policy benefits and SDI are set from this)
+    inc:   monthly income that a disability takes away; take-home pay when p.after_tax,
+           since policy benefits (premiums paid with your own money), SDI and SSDI are tax-free
+    """
     def __init__(self, p: Person, T):
         path = {p.age: p.income, **(p.income_path or default_income_path(p.age, p.income))}
         ages, incs = zip(*sorted(path.items()))
         self.T, self.lnv = T, math.log(1 + p.discount_rate / 100) / 12
         mid_age = p.age + (np.arange(T) + 0.5) / 12
         yearly = np.interp(mid_age, ages, incs)
-        self.inc = yearly / 12
+        self.gross = yearly / 12
+        self.inc = np.array([take_home(y, p.california) for y in yearly]) / 12 if p.after_tax else self.gross
         self.sdi = np.array([sdi_monthly(y) for y in yearly]) if p.california else np.zeros(T)
         v = np.exp(-self.lnv * (np.arange(T) + 0.5))
         self.CI = np.r_[0, np.cumsum(self.inc * v)]
         self.CS = np.r_[0, np.cumsum(self.sdi * v)]
-        self.CR = np.r_[0, np.cumsum(self.inc / (p.income / 12) * v)]
-        self.nominal_ratio = float(np.sum(self.inc / (p.income / 12)))
+        self.CR = np.r_[0, np.cumsum(self.gross / (p.income / 12) * v)]
+        self.nominal_ratio = float(np.sum(self.gross / (p.income / 12)))
 
     def span(self, C, a, b):                      # discounted total between months a and b
         a, b = np.clip(a, 0, self.T), np.clip(b, 0, self.T)
@@ -223,7 +268,7 @@ class Money:
 
 
 def baseline(sim, p, M):
-    """Loss per life with no private policy: income lost minus SDI (today's dollars)."""
+    """Loss per life with no private policy: income lost minus SDI (today's dollars; take-home if p.after_tax)."""
     st, d, life = sim["start"], sim["length"], sim["life"]
     lost = M.span(M.CI, st, st + d)
     sdi = np.where(d > 0.23, M.span(M.CS, st + 0.23, st + np.minimum(d, 12)), 0.0)
@@ -240,7 +285,7 @@ def run_policy(sim, p, pol: Policy, base, M):
     e = pol.elim_months
     bp = 1e9 if pol.benefit_months is None else pol.benefit_months
     claims = d > e
-    ben_m = pol.benefit_pct / 100 * (M.at(st, M.inc) if pol.future_increase else p.income / 12)
+    ben_m = pol.benefit_pct / 100 * (M.at(st, M.gross) if pol.future_increase else p.income / 12)
     b0, b1 = st + e, st + np.minimum(d, e + bp)
     benefit = np.where(claims, M.ann(b0, b1) * ben_m, 0.0)
     if pol.sdi_offset and p.california:
@@ -260,7 +305,8 @@ def run_policy(sim, p, pol: Policy, base, M):
 
 
 def years_below_floor(sim, p, pol, M, floor, ssdi=18_000, ssdi_approval=0.5):
-    """Years each life spends with income below `floor` a year (SDI + SSDI if approved + benefits)."""
+    """Years each life spends with income below `floor` a year (SDI + SSDI if approved + benefits).
+    All three are tax-free here, so compare them with a take-home floor."""
     st, d, life, n = sim["start"], sim["length"], sim["life"], sim["n"]
     idx_in_life = np.zeros(len(life), int)
     for k in range(1, len(life)):
@@ -270,7 +316,7 @@ def years_below_floor(sim, p, pol, M, floor, ssdi=18_000, ssdi_approval=0.5):
     s_m = M.at(st, M.sdi)
     e = pol.elim_months if pol else 1e9
     bp = (1e9 if pol.benefit_months is None else pol.benefit_months) if pol else 0
-    ben_m = (pol.benefit_pct / 100 * (M.at(st, M.inc) if pol.future_increase else p.income / 12)) if pol else 0 * st
+    ben_m = (pol.benefit_pct / 100 * (M.at(st, M.gross) if pol.future_increase else p.income / 12)) if pol else 0 * st
     pts = np.stack([np.zeros_like(d), d, np.full_like(d, 0.23), np.full_like(d, 12), np.full_like(d, 5),
                     np.full_like(d, float(e)), np.full_like(d, float(e + bp))], axis=1)
     pts = np.sort(np.minimum(pts, d[:, None]), axis=1)
@@ -311,3 +357,4 @@ if __name__ == "__main__":
         print(name, f"premium ${x['premium']:.0f}/mo  pays out {x['p_claim']:.1%}  "
               f"1-in-100 loss ${np.quantile(x['loss'], .99):,.0f}")
     print("no policy 1-in-100 loss", f"${np.quantile(r['base']['loss'], .99):,.0f}")
+    print(f"take-home on $95k in California: ${take_home(95_000):,.0f}")
