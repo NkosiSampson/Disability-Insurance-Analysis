@@ -77,7 +77,14 @@ with st.sidebar:
                 for a, v in defaults.items()}
 
     with st.expander("Assumptions"):
-        rate = st.slider("Discount rate (after inflation)", 0.0, 6.0, 3.0, 0.5, format="%.1f%%")
+        rate = st.slider("Discount rate (after inflation)", 0.0, 6.0, 3.0, 0.5, format="%.1f%%",
+                         help="Turns money paid or lost in future years into today's dollars, because money you "
+                              "have now could be invested and grow. At 3%, losing \\$1,000 thirty years from now "
+                              "counts as about \\$410 today. It's after inflation because incomes here are in "
+                              "today's dollars too. A higher rate makes losses far in the future, like a long "
+                              "disability at a young age, look smaller, so insurance looks less valuable. At 0%, a "
+                              "future dollar counts the same as a dollar today. The \"Total premiums by age 65\" row "
+                              "is not discounted.")
         payout = st.slider("Insurer payout ratio for estimated premiums", 40, 85, 60, 5, format="%d%%",
                            help="Share of premiums the insurer expects to pay back as benefits.")
         after_tax = st.checkbox("Count income after taxes (take-home pay)", value=True,
