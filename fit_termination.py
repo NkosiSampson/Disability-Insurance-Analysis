@@ -25,8 +25,8 @@ df = load_idec(DATA_FILE)
 print(f"Loaded {len(df):,} rows")
 
 # %% 2. Keep personal disability policies that pay to age 65-70 or for life
-df = df[df["type_of_policy"].str.startswith("2 =")
-        & df["study_benefit_period_units"].isin(["2", "3"])].copy()
+df = df[df["type_of_policy"].str.startswith("2 =") # The Soa report says A&S was 94% of policies over 2006–2014. So, filtering the pivot table, we see that refers to type_of_policy == 2
+        & df["study_benefit_period_units"].isin(["2", "3"])].copy() # by checking the pivot table with fields "age at onset", "age attatined", and "count exposed" you can see 2 and 3 are to a high age or life.
 
 # Month on claim. "M07" = month 7. "Y06" rows cover a whole year, and their
 # exposure is counted in claim-years, so convert to claim-months (x12).
