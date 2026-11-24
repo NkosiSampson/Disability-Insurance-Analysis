@@ -15,11 +15,12 @@ The result is not a recommendation. Every policy pays back about 60 cents per pr
 | File | What it is |
 | --- | --- |
 | `app.py` | The interactive dashboard (Streamlit) |
-| `disability_model.py` | The simulation model, with the fitted SOA coefficients built in |
+| `disability_model.py` | The simulation model; reads the fitted SOA coefficients from `model_inputs/` |
 | `requirements.txt` | Python packages the app needs |
 | `read_idec_pivot.py` | Decodes the raw records hidden inside the SOA pivot files |
 | `fit_incidence.py` | Fits the claim incidence model (how often claims start) |
 | `fit_termination.py` | Fits the claim termination models (recovery and death) |
+| `model_inputs/` | The fitted model coefficients and tables the dashboard reads (written by the fit scripts) |
 
 ## Run it yourself
 
@@ -28,7 +29,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-The app does not need the raw data. The fitted coefficients are already stored in `disability_model.py`. You only need the data below if you want to refit the models and check the numbers yourself.
+The app does not need the raw data. The fitted coefficients are already stored in `model_inputs/`. You only need the data below if you want to refit the models and check the numbers yourself.
 
 ## Data: where it comes from and how to get it
 
@@ -86,7 +87,7 @@ The model assumes a single filer taking the standard deduction: federal income t
    python fit_incidence.py
    python fit_termination.py
    ```
-   Each script prints the rate ratios with confidence intervals and saves them to CSV, along with a chart.
+   Each script prints the rate ratios with confidence intervals, saves a chart, and writes its coefficients to `model_inputs/`, which the dashboard reads. So a refit updates the dashboard automatically.
 
 You can also use the reader in your own code:
 

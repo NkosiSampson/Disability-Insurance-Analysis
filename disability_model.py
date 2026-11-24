@@ -7,22 +7,62 @@ Society of Actuaries (SOA) individual disability data, then compares insurance p
     from disability_model import Person, Policy, run_model
     res = run_model(Person(age=23, income=95000), [Policy(elim_months=3), Policy(elim_months=12)])
 
-Data (see the notebooks for how the models were fitted):
+Data (CSV files in model_inputs/, written by fit_incidence.py and fit_termination.py):
   INC  Poisson model of how often claims start (SOA IDEC claim incidence study, 2006-2015)
   GLM  Poisson models of recovery and death while disabled (SOA IDEC claim termination study)
-  SSA  healthy-worker mortality by age and sex (SSA Actuarial Note 2026.6)
+  SSA  healthy-worker death rates by age and sex (SSA Actuarial Note 2026.6)
   TAX  2026 federal, Social Security/Medicare and California income taxes (single filer),
        used to turn income into take-home pay
 Only numpy is required.
 """
 from dataclasses import dataclass, field
 from typing import Optional
-import json
+import csv
 import math
+from pathlib import Path
 import numpy as np
 
-DATA = json.loads(r'''{"SSA":{"m":{"inc":[0.001789,0.001675,0.001557,0.001695,0.001908,0.001538,0.001164,0.001335,0.001462,0.001611,0.001712,0.001766,0.001849,0.001947,0.002041,0.002202,0.002379,0.002506,0.002641,0.00281,0.002956,0.003108,0.003309,0.003515,0.00374,0.004022,0.004328,0.00461,0.004846,0.005052,0.006395,0.007995,0.008069,0.007959,0.008289,0.010759,0.013626,0.013872,0.014003,0.014915,0.015766,0.016771,0.017626,0.017217,0.014791,0.011738,0.008757],"qa":[0.001106,0.001167,0.00121,0.001244,0.001281,0.001339,0.00142,0.001492,0.00156,0.001631,0.001698,0.001771,0.001849,0.001934,0.002017,0.002084,0.002134,0.002176,0.002211,0.002241,0.002269,0.00229,0.002323,0.002333,0.002336,0.002345,0.002352,0.002358,0.002407,0.002511,0.002686,0.00286,0.002981,0.003093,0.003214,0.003482,0.003716,0.003943,0.004213,0.004467,0.004815,0.005157,0.005426,0.005871,0.006379,0.007111,0.007786],"qd":[0,0.01293,0.00965,0.00873,0.00871,0.00806,0.00729,0.00793,0.00865,0.00903,0.00986,0.01035,0.01092,0.01128,0.0116,0.0122,0.01283,0.01323,0.01366,0.01427,0.01495,0.01568,0.01594,0.0167,0.01737,0.01764,0.01781,0.01829,0.01875,0.01938,0.01984,0.02024,0.02092,0.02164,0.02247,0.02203,0.02215,0.02247,0.02288,0.02366,0.02388,0.02431,0.02535,0.02576,0.02652,0.02708,0.02746],"rec":[0,0.00337,0.00322,0.00406,0.00932,0.01925,0.02219,0.02256,0.02341,0.02262,0.02528,0.02763,0.02672,0.0254,0.02428,0.02461,0.02457,0.02332,0.02231,0.02222,0.02114,0.02002,0.01877,0.01715,0.01657,0.01646,0.01537,0.01403,0.01299,0.01152,0.01104,0.01015,0.00892,0.00805,0.00687,0.00645,0.00619,0.00533,0.00466,0.00414,0.00431,0.00453,0.00398,0.00326,0.00283,0.00235,0.00193]},"f":{"inc":[0.00134,0.001224,0.001098,0.001235,0.001454,0.001249,0.001058,0.001244,0.001387,0.001555,0.001708,0.001818,0.001949,0.002114,0.002291,0.00246,0.002619,0.002783,0.002952,0.003145,0.003503,0.003877,0.004089,0.004323,0.004576,0.004841,0.005131,0.005397,0.005626,0.005817,0.007323,0.009075,0.009029,0.008788,0.009029,0.011262,0.013807,0.013902,0.013873,0.014494,0.014249,0.014133,0.0147,0.01432,0.01235,0.00992,0.007496],"qa":[0.000403,0.000424,0.000444,0.000459,0.000474,0.000493,0.000512,0.000545,0.000584,0.00063,0.000671,0.000715,0.000764,0.000806,0.000848,0.000876,0.000895,0.000918,0.000956,0.000986,0.000994,0.001007,0.001018,0.001057,0.001083,0.001111,0.001129,0.001154,0.001171,0.001233,0.001319,0.001399,0.001457,0.001549,0.001651,0.001808,0.002014,0.002136,0.002288,0.002493,0.002671,0.002823,0.002953,0.003107,0.003456,0.003969,0.004335],"qd":[0,0.01049,0.00788,0.00777,0.00772,0.00714,0.00744,0.00728,0.00767,0.00829,0.00973,0.0106,0.01066,0.01077,0.01079,0.0111,0.01184,0.01212,0.01169,0.01153,0.01207,0.01233,0.01281,0.01277,0.01306,0.01315,0.01329,0.01319,0.01352,0.01356,0.01375,0.01392,0.01418,0.01422,0.01453,0.01465,0.01444,0.01492,0.01529,0.0154,0.01572,0.0162,0.01686,0.01757,0.01794,0.01833,0.01909],"rec":[0,0.003,0.00315,0.00388,0.00689,0.01638,0.0197,0.01924,0.01886,0.01795,0.02172,0.02432,0.02294,0.02225,0.02134,0.02146,0.02194,0.02103,0.01997,0.01886,0.01849,0.01814,0.01741,0.01647,0.0157,0.01541,0.01461,0.01389,0.01285,0.01176,0.01094,0.00994,0.00898,0.00802,0.00697,0.00639,0.00591,0.00523,0.0047,0.00421,0.00404,0.00387,0.00332,0.0028,0.00242,0.00199,0.00164]}},"GLM":{"rec":{"b0":-2.9493,"dur":{"4-6m":0,"1-3m":0.23935,"7-12m":-0.32117,"13-24m":-1.4507,"25-36m":-2.33263,"37-60m":-3.24815,"6-10y":-4.31551,"11-15y":-5.17721,"16-20y":-5.73734,"21y+":-6.50727},"onset":{"40-49":0,"50-59":-0.31375,"60+":-0.53822,"<40":0.26617},"sex":{"Male":0,"Female":0.04927},"cls":{"1":0,"2":0.0616,"3":0.07713,"4":0.02359,"M":0.10025},"ben":{"<2500":0,"10000-14999":-0.39862,"15000-19999":-0.68563,"20000+":-1.00572,"2500-4999":-0.11375,"5000-7499":-0.21995,"7500-9999":-0.3237},"diag":{"Back":0,"Alcohol & Drug":0.65242,"Cancer":0.19933,"Circulatory":0.14543,"Diabetes":-1.26946,"Diagnosis Not Provided":0.75666,"Digestive":0.56149,"Ill-defined and Misc Conditions":0.23382,"Infectious Diseases":0.15752,"Injury Other Than Back":0.90825,"Maternity":1.76458,"Mental & Nervous":-0.12095,"Nervous System":-0.94638,"Other":0.08873,"Other Musculoskeletal":0.36501,"Respiratory":-0.11554}},"dth":{"b0":-6.66681,"dur":{"4-6m":0,"1-3m":-0.34534,"7-12m":0.11626,"13-24m":0.05377,"25-36m":-0.24965,"37-60m":-0.61793,"6-10y":-0.84358,"11-15y":-0.74995,"16-20y":-0.47841,"21y+":0.11178},"onset":{"40-49":0,"50-59":0.30731,"60+":0.45591,"<40":-0.43716},"sex":{"Male":0,"Female":-0.46113},"cls":{"1":0,"2":-0.14197,"3":0.14295,"4":-0.48626,"M":-0.22835},"ben":{"<2500":0,"10000-14999":-0.61063,"15000-19999":-0.69934,"20000+":-0.86767,"2500-4999":-0.22765,"5000-7499":-0.37514,"7500-9999":-0.44332},"diag":{"Back":0,"Alcohol & Drug":1.02615,"Cancer":2.94893,"Circulatory":0.80816,"Diabetes":1.13123,"Diagnosis Not Provided":1.22224,"Digestive":1.22106,"Ill-defined and Misc Conditions":0.80911,"Infectious Diseases":0.97492,"Injury Other Than Back":0.13915,"Maternity":0.39453,"Mental & Nervous":0.45383,"Nervous System":0.94257,"Other":0.61108,"Other Musculoskeletal":-0.25005,"Respiratory":1.18899}},"mix":{"m":{"Alcohol & Drug":0.0245,"Back":0.1234,"Cancer":0.1666,"Circulatory":0.094,"Diabetes":0.0041,"Digestive":0.0227,"Ill-defined and Misc Conditions":0.0156,"Infectious Diseases":0.0116,"Injury Other Than Back":0.1191,"Maternity":0.0006,"Mental & Nervous":0.1034,"Nervous System":0.0997,"Other":0.0691,"Other Musculoskeletal":0.1344,"Respiratory":0.0112},"f":{"Alcohol & Drug":0.0093,"Back":0.1062,"Cancer":0.1972,"Circulatory":0.0403,"Diabetes":0.0018,"Digestive":0.019,"Ill-defined and Misc Conditions":0.0166,"Infectious Diseases":0.0101,"Injury Other Than Back":0.1083,"Maternity":0.0848,"Mental & Nervous":0.0916,"Nervous System":0.0828,"Other":0.0568,"Other Musculoskeletal":0.1639,"Respiratory":0.0113}}},"INC":{"b0":-6.24753,"age":{"40-44":0,"30-34":-0.26976,"35-39":-0.16973,"45-49":0.27078,"50-54":0.6127,"55-59":0.98359,"60-64":1.23183,"65+":1.15109,"<30":-0.62276},"sex":{"Male":0,"Female":0.37311},"cls":{"1":0,"2":0.2319,"3":0.66962,"4":0.75345,"M":0.43987},"smoker":{"No":0,"Unknown":0.11691,"Yes":0.31663},"ep":{"90":0,"180+":-0.49645,"30":0.96224,"60":0.41596,"<30":1.06247},"bp":{"ToAge":0,"Lifetime":0.1935,"Short":0.06834},"state":{"Others":0,"California":0.23579,"Florida":0.11414},"pdur":{"6-10":0,"1":-0.04479,"11-15":0.03467,"16-20":0.05826,"2":-0.07916,"21+":-0.0522,"3":-0.01841,"4":0.0358,"5":0.01936},"uw":{"1":0,"2":0.07386,"4":0.28937},"mkt":{"1":0,"2":-0.04749,"3":-0.18176,"4":-0.1642,"5":-0.01322,"X":-0.32025}}}''')
-SSA, GLM, INC = DATA["SSA"], DATA["GLM"], DATA["INC"]
+# ---------------------------------------------------------------- model inputs
+# The fitted numbers live in plain CSV files in model_inputs/ (open them like any table):
+#   incidence_coefficients.csv  how often disabilities start   (written by fit_incidence.py)
+#   recovery_coefficients.csv   how fast people recover        (written by fit_termination.py)
+#   death_coefficients.csv      how often claimants die        (written by fit_termination.py)
+#   diagnosis_mix.csv           share of long claims by diagnosis, for men and women
+#   ssa_death_rates.csv         yearly death rates of healthy workers by age (SSA Actuarial Note 2026.6)
+# Each coefficient adds to the log of a rate; rate_ratio = exp(coefficient) is the same thing as a multiplier.
+INPUTS = Path(__file__).resolve().parent / "model_inputs"
+
+# short names used inside the model for each variable in the CSV files
+INC_KEYS = {"age": "age", "sex": "sex", "occ_class": "cls", "smoker": "smoker", "elim": "ep",
+            "benefit_period": "bp", "state": "state", "policy_year": "pdur", "underwriting": "uw", "market": "mkt"}
+GLM_KEYS = {"dur_band": "dur", "onset": "onset", "sex": "sex", "occ_class": "cls", "benefit": "ben",
+            "diagnosis": "diag", "elim": "elim"}
+
+
+def _read_csv(name):
+    with open(INPUTS / name, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def load_coefficients(name, keys):
+    """Read a coefficient file into {"b0": intercept, short_name: {level: coefficient}}."""
+    model = {short: {} for short in keys.values()}
+    for row in _read_csv(name):
+        if row["variable"] == "Intercept":
+            model["b0"] = float(row["coefficient"])
+        elif row["variable"] in keys:
+            model[keys[row["variable"]]][row["level"]] = float(row["coefficient"])
+    return model
+
+
+INC = load_coefficients("incidence_coefficients.csv", INC_KEYS)
+GLM = {"rec": load_coefficients("recovery_coefficients.csv", GLM_KEYS),
+       "dth": load_coefficients("death_coefficients.csv", GLM_KEYS),
+       "mix": {"m": {r["diagnosis"]: float(r["male_share"]) for r in _read_csv("diagnosis_mix.csv")},
+               "f": {r["diagnosis"]: float(r["female_share"]) for r in _read_csv("diagnosis_mix.csv")}}}
+_ssa = _read_csv("ssa_death_rates.csv")
+SSA = {"m": {"qa": [float(r["male"]) for r in _ssa]},      # qa[0] is age 20, qa[46] is age 66
+       "f": {"qa": [float(r["female"]) for r in _ssa]}}
 
 N_LIVES = 50_000
 SEED = 20260926

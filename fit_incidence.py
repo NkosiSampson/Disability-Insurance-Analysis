@@ -18,6 +18,8 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
+import os
+import re
 import warnings; warnings.filterwarnings("ignore")
 from read_idec_pivot import load_idec
 
@@ -80,6 +82,27 @@ print(f"\nReference annual claim rate: {np.exp(model.params['Intercept']):.4%} "
       "(age 40-44, male, class 1, non-smoker, 90-day wait, benefits to 65-70, not CA/FL, "
       "policy years 6-10, fully underwritten, individual market)")
 rr.to_csv("incidence_rate_ratios.csv")
+
+
+def save_coefficients(model, path):
+    """Write a fitted model's coefficients as a readable table; disability_model.py reads these files."""
+    rows, seen = [("Intercept", "", model.params["Intercept"])], set()
+    for name, b in model.params.items():
+        m = re.match(r"C\((\w+), Treatment\('([^']*)'\)\)\[T\.(.*)\]$", name)
+        if not m:
+            continue
+        var, ref, level = m.groups()
+        if var not in seen:                     # the reference level has coefficient 0
+            seen.add(var); rows.append((var, ref, 0.0))
+        rows.append((var, level, b))
+    out = pd.DataFrame(rows, columns=["variable", "level", "coefficient"])
+    out["coefficient"] = out["coefficient"].round(5)
+    out["rate_ratio"] = np.where(out["variable"] == "Intercept", np.nan, np.exp(out["coefficient"]).round(4))
+    os.makedirs("model_inputs", exist_ok=True)
+    out.to_csv(path, index=False)
+    print(f"Wrote {path}")
+
+save_coefficients(model, "model_inputs/incidence_coefficients.csv")
 
 
 # %% 5. Predicted annual claim rates by age for example profiles

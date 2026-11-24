@@ -13,6 +13,9 @@
 # Run locally:   python fit_termination.py
 
 # %% 1. Load the full dataset (about 3.3 million rows)
+import os
+import re
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -93,6 +96,29 @@ print(rr_dth)
 rr_all.to_csv("rate_ratios_terminations.csv")
 rr_rec.to_csv("rate_ratios_recovery.csv")
 rr_dth.to_csv("rate_ratios_death.csv")
+
+
+def save_coefficients(model, path):
+    """Write a fitted model's coefficients as a readable table; disability_model.py reads these files."""
+    rows, seen = [("Intercept", "", model.params["Intercept"])], set()
+    for name, b in model.params.items():
+        m = re.match(r"C\((\w+), Treatment\('([^']*)'\)\)\[T\.(.*)\]$", name)
+        if not m:
+            continue
+        var, ref, level = m.groups()
+        if var not in seen:                     # the reference level has coefficient 0
+            seen.add(var); rows.append((var, ref, 0.0))
+        rows.append((var, level, b))
+    out = pd.DataFrame(rows, columns=["variable", "level", "coefficient"])
+    out["coefficient"] = out["coefficient"].round(5)
+    out["rate_ratio"] = np.where(out["variable"] == "Intercept", np.nan, np.exp(out["coefficient"]).round(4))
+    os.makedirs("model_inputs", exist_ok=True)
+    out.to_csv(path, index=False)
+    print(f"Wrote {path}")
+
+save_coefficients(model_rec, "model_inputs/recovery_coefficients.csv")
+save_coefficients(model_dth, "model_inputs/death_coefficients.csv")
+
 
 # %% 5. Predicted claim survival curves for example profiles
 # Chance a claim is still open, starting from month 3 (end of a 90-day wait).
