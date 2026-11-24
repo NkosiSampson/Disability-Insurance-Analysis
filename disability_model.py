@@ -68,6 +68,9 @@ N_LIVES = 50_000
 SEED = 20260926
 SDI_CAP, SDI_90_LIMIT = 1765.0, 1252.30            # 2026 California SDI weekly cap and 90% threshold
 BMI_RR = {"under": 1.20, "normal": 1.0, "over": 1.13, "obese": 1.52}
+# Share of U.S. adults in each BMI group, Aug 2021-Aug 2023, age adjusted (CDC Health E-Stats 111 and 119):
+# underweight 1.6%, overweight 31.7%, obese 40.3%; normal = the remainder, 26.4%. Rounded here.
+# Used to center BMI_RR so an average-BMI person keeps the SOA rate.
 BMI_MIX = {"under": 0.02, "normal": 0.27, "over": 0.31, "obese": 0.40}
 LT_BANDS = [(6, "4-6m"), (12, "7-12m"), (24, "13-24m"), (36, "25-36m"), (60, "37-60m"),
             (120, "6-10y"), (180, "11-15y"), (240, "16-20y"), (10**9, "21y+")]
