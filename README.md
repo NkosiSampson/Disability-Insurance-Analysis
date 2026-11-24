@@ -72,7 +72,15 @@ The model uses the 2026 rules: 90% of weekly wages up to $1,252.30, otherwise 70
 
 The SOA rates already include people of every weight, so the model divides each multiplier by the population average (about 1.25, using the CDC shares). On average, the BMI adjustment leaves the SOA rate unchanged. Two limitations: the study measured permanent disability retirement, mostly in European pension systems, while the model applies the multipliers to all new claims; and the CDC shares describe all U.S. adults, while people who buy individual disability insurance are likely healthier than average.
 
-### 6. 2026 taxes (for take-home pay)
+BMI also changes the chance of dying while healthy, using [The Global BMI Mortality Collaboration (2016), *Body-mass index and all-cause mortality: individual-participant-data meta-analysis of 239 prospective studies in four continents*, The Lancet](https://pubmed.ncbi.nlm.nih.gov/27423262/). Death rates compared with BMI 22.5–25, in never-smokers without chronic disease: underweight (BMI 15–18.5) 1.51, overweight 1.13 (the average of 1.07 for BMI 25–27.5 and 1.20 for 27.5–30), obese 1.45 (BMI 30–35). Higher BMIs carry more risk (1.94 for 35–40, 2.76 for 40+), so the model understates it for them. These are also averaged over the CDC shares.
+
+### 6. Smoking and chronic conditions
+
+- **Smoking and death:** [Jha et al. (2013), *21st-century hazards of smoking and benefits of cessation in the United States*, New England Journal of Medicine](https://pubmed.ncbi.nlm.nih.gov/23343063/): current smokers aged 25–79 die at 2.8 times the rate of never-smokers (men) and 3.0 times (women). The SSA death rates include smokers, so the model divides by the population average, using the [9.1% of U.S. adults who currently smoke cigarettes (CDC, National Health Interview Survey, 2025 early release)](https://www.cdc.gov/nchs/fastats/smoking.htm). Smoking's effect on starting a disability comes from the SOA data itself.
+- **Chronic condition and disability:** [Ervasti et al. (2016), *Contribution of comorbid conditions to the association between diabetes and disability pensions*, Scandinavian Journal of Work, Environment & Health](https://www.sjweh.fi/article/3556): fully adjusted hazard ratios for disability pension of 1.63 for diabetes, 1.73 for musculoskeletal disorders and 1.35 for cardiovascular disease, the three conditions the app names. The model uses their average, 1.57. It is applied in full because the SOA data comes from underwritten policyholders, a group screened to have few chronic conditions. Limitations: it is a Swedish population cohort measuring permanent disability pensions, and other conditions differ (depression was 2.93).
+- **Assumptions with no published figure:** a chronic condition's effect on death while healthy (1.4×; for two or more conditions in older adults a meta-analysis found 1.73, [Nunes et al. 2016](https://pubmed.ncbi.nlm.nih.gov/27500661/)), and high-risk hobbies' effect on disability (1.15×).
+
+### 7. 2026 taxes (for take-home pay)
 
 - [IRS: 2026 tax brackets and standard deduction](https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill)
 - [California FTB: 2026 tax rate schedule and standard deduction](https://www.ftb.ca.gov/about-ftb/newsroom/tax-news/2026/10.html)

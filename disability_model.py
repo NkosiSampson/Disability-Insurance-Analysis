@@ -97,11 +97,35 @@ BMI_RISK_MULTIPLIER = {"under": 1.20, "normal": 1.0, "over": 1.13, "obese": 1.52
 #   normal 26.4%  - not published; the remainder, 100 - 1.6 - 31.7 - 40.3
 # Used to average BMI_RISK_MULTIPLIER back to 1 across the population, because the SOA rates already include every BMI.
 BMI_POPULATION_SHARE = {"under": 0.016, "normal": 0.264, "over": 0.317, "obese": 0.403}
-CHRONIC_CONDITION_DISABILITY_MULTIPLIER = 1.5     # assumption
-RISKY_HOBBY_DISABILITY_MULTIPLIER = 1.15          # assumption
-# Death-rate multipliers while healthy, each divided by its population average so the SSA rate stays the average
-SMOKER_DEATH_MULTIPLIER, SMOKER_POPULATION_SHARE = 1.8, 0.12
-OBESE_DEATH_MULTIPLIER, OBESE_POPULATION_SHARE = 1.3, 0.4
+# Disability risk with a chronic condition: the average of the fully adjusted hazard ratios for disability pension
+# for the three conditions the app names (diabetes 1.63, musculoskeletal disorder 1.73, cardiovascular disease 1.35)
+# in Ervasti J et al. "Contribution of comorbid conditions to the association between diabetes and disability
+# pensions: a population-based nationwide cohort study." Scand J Work Environ Health. 2016;42(3):209-216.
+# https://www.sjweh.fi/article/3556  A Swedish population cohort measuring permanent disability pensions; other
+# conditions differ (depression was 2.93). Applied in full, because the SOA data comes from underwritten policyholders,
+# a group screened to have few chronic conditions.
+CHRONIC_CONDITION_DISABILITY_MULTIPLIER = round((1.63 + 1.73 + 1.35) / 3, 2)   # 1.57
+# Assumption (no published figure found): high-risk hobbies raise disability risk by 15%.
+RISKY_HOBBY_DISABILITY_MULTIPLIER = 1.15
+
+# Death-rate multipliers while healthy. The SSA rates are averages over everyone, so each multiplier is divided by
+# its population average: an average person keeps the SSA rate, and only people above or below average move.
+# Smoking: all-cause death rate of current vs never smokers, ages 25-79 (men 2.8, 99% CI 2.4-3.1; women 3.0,
+# 2.7-3.3), from Jha P et al. "21st-century hazards of smoking and benefits of cessation in the United States."
+# N Engl J Med. 2013;368(4):341-350. https://pubmed.ncbi.nlm.nih.gov/23343063/
+SMOKER_DEATH_MULTIPLIER = {"m": 2.8, "f": 3.0}
+# Share of U.S. adults who currently smoke cigarettes: 9.1% (CDC, National Health Interview Survey, 2025 early release).
+# https://www.cdc.gov/nchs/fastats/smoking.htm
+SMOKER_POPULATION_SHARE = 0.091
+# Body mass index: all-cause death rate relative to BMI 22.5-25, never-smokers without chronic disease, from
+# The Global BMI Mortality Collaboration. "Body-mass index and all-cause mortality: individual-participant-data
+# meta-analysis of 239 prospective studies in four continents." Lancet. 2016;388(10046):776-786.
+# https://pubmed.ncbi.nlm.nih.gov/27423262/  underweight = BMI 15-18.5 (1.51); normal = 1; overweight = average of
+# BMI 25-27.5 (1.07) and 27.5-30 (1.20); obese = BMI 30-35 (1.45). Higher BMIs carry more risk (35-40: 1.94,
+# 40+: 2.76), so this understates it for them. Averaged over BMI_POPULATION_SHARE.
+BMI_DEATH_MULTIPLIER = {"under": 1.51, "normal": 1.0, "over": round((1.07 + 1.20) / 2, 3), "obese": 1.45}
+# Assumption (no published figure for a single chronic condition found; for two or more conditions in older adults
+# a meta-analysis found 1.73: Nunes BP et al., Arch Gerontol Geriatr. 2016;67:130-138).
 CHRONIC_CONDITION_DEATH_MULTIPLIER = 1.4
 
 # Time-on-claim bands used by the recovery and death models: (last claim month in the band, band label)
@@ -287,15 +311,18 @@ def simulate_lives(person: Person, number_of_lives=NUMBER_OF_SIMULATED_LIVES, se
     healthy_death_rates = HEALTHY_DEATH_RATES[person.sex]
 
     # Multipliers on top of the SOA and SSA rates for factors those models don't include.
-    # Each is divided by its population average, so an average person keeps the published rate.
+    # BMI and smoking multipliers are divided by their population averages, so an average person keeps the
+    # published rate. The chronic-condition and hobby multipliers are applied in full (see their comments above).
     average_bmi_multiplier = sum(BMI_RISK_MULTIPLIER[group] * BMI_POPULATION_SHARE[group] for group in BMI_POPULATION_SHARE)
     disability_multiplier = (BMI_RISK_MULTIPLIER[person.bmi_group] / average_bmi_multiplier
                              * (CHRONIC_CONDITION_DISABILITY_MULTIPLIER if person.has_chronic_condition else 1)
                              * (RISKY_HOBBY_DISABILITY_MULTIPLIER if person.has_risky_hobby else 1))
-    death_multiplier = ((SMOKER_DEATH_MULTIPLIER if person.is_smoker else 1)
-                        / (1 - SMOKER_POPULATION_SHARE + SMOKER_POPULATION_SHARE * SMOKER_DEATH_MULTIPLIER)
-                        * (OBESE_DEATH_MULTIPLIER if person.bmi_group == "obese" else 1)
-                        / (OBESE_POPULATION_SHARE * OBESE_DEATH_MULTIPLIER + (1 - OBESE_POPULATION_SHARE))
+    smoker_multiplier = SMOKER_DEATH_MULTIPLIER[person.sex]
+    average_smoker_multiplier = 1 - SMOKER_POPULATION_SHARE + SMOKER_POPULATION_SHARE * smoker_multiplier
+    average_bmi_death_multiplier = sum(BMI_DEATH_MULTIPLIER[group] * BMI_POPULATION_SHARE[group]
+                                       for group in BMI_POPULATION_SHARE)
+    death_multiplier = ((smoker_multiplier if person.is_smoker else 1) / average_smoker_multiplier
+                        * BMI_DEATH_MULTIPLIER[person.bmi_group] / average_bmi_death_multiplier
                         * (CHRONIC_CONDITION_DEATH_MULTIPLIER if person.has_chronic_condition else 1))
 
     # Log of the yearly claim rate from the parts of the incidence model that don't change with age.

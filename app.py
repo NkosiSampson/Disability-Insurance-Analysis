@@ -349,8 +349,12 @@ disability that lasts over 30 days. Every policy is applied to the same lives.
   the standard deduction. Policy benefits are a percentage of pre-tax income but are tax-free when you pay the
   premiums yourself, as are SDI and (at these amounts) SSDI. Employer-paid policies would be taxable.
 - **BMI:** risk multipliers from a meta-analysis of disability retirement (Shiri et al., 2020), averaged over the
-  U.S. adult BMI mix from CDC NHANES 2021–2023.
-- **Assumptions:** chronic condition (1.5×), hobbies (1.15×), the 15% income-growth default,
+  U.S. adult BMI mix from CDC NHANES 2021–2023. Death rates by BMI from the Global BMI Mortality Collaboration (2016).
+- **Smoking and deaths while healthy:** current smokers die at 2.8 (men) to 3.0 (women) times the rate of never
+  smokers (Jha et al., 2013), averaged over the 9.1% of U.S. adults who smoke (CDC).
+- **Chronic condition:** 1.57× the disability rate, the average for diabetes, musculoskeletal disorders and heart
+  disease in a Swedish cohort (Ervasti et al., 2016).
+- **Assumptions:** chronic condition's effect on death rates (1.4×), hobbies (1.15×), the 15% income-growth default,
   and the 60% payout ratio behind estimated premiums.
 
 This is an educational model, not financial advice.
