@@ -2,3 +2,5 @@ streamlit>=1.40
 altair>=5
 numpy
 pandas
+statsmodels
+matplotlib
