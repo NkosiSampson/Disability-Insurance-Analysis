@@ -40,6 +40,15 @@ GLM_KEYS = {"dur_band": "dur", "onset": "onset", "sex": "sex", "occ_class": "cls
 
 
 def _read_csv(name):
+    """Read one CSV file from the model_inputs folder.
+
+    Returns a list with one dictionary per row (the header row is not included).
+    Each dictionary's keys are the column names from the header row, and its values
+    are that row's entries, as text (strings), so numbers must be converted with float().
+
+    Example: _read_csv("recovery_coefficients.csv")[1] ->
+        {'variable': 'dur_band', 'level': '4-6m', 'coefficient': '0', 'rate_ratio': '1.0'}
+    """
     with open(INPUTS / name, newline="") as f:
         return list(csv.DictReader(f))
 
@@ -67,11 +76,19 @@ SSA = {"m": {"qa": [float(r["male"]) for r in _ssa]},      # qa[0] is age 20, qa
 N_LIVES = 50_000
 SEED = 20260926
 SDI_CAP, SDI_90_LIMIT = 1765.0, 1252.30            # 2026 California SDI weekly cap and 90% threshold
+# Disability risk by BMI, relative to normal weight (18.5-24.9). Pooled risk ratios for all-cause
+# disability retirement from Shiri R, Falah-Hassani K, Lallukka T. "Body mass index and the risk of
+# disability retirement: a systematic review and meta-analysis." Occup Environ Med. 2020;77(1):48-55.
+# https://pubmed.ncbi.nlm.nih.gov/31467042/  (underweight 1.20, 95% CI 1.02-1.41; overweight 1.13,
+# 1.07-1.19; obese 1.52, 1.36-1.71). The study measured disability retirement; applying the ratios to
+# all new claims is an assumption.
 BMI_RR = {"under": 1.20, "normal": 1.0, "over": 1.13, "obese": 1.52}
-# Share of U.S. adults in each BMI group, Aug 2021-Aug 2023, age adjusted (CDC Health E-Stats 111 and 119):
-# underweight 1.6%, overweight 31.7%, obese 40.3%; normal = the remainder, 26.4%. Rounded here.
-# Used to center BMI_RR so an average-BMI person keeps the SOA rate.
-BMI_MIX = {"under": 0.02, "normal": 0.27, "over": 0.31, "obese": 0.40}
+# Share of U.S. adults age 20+ in each BMI group, CDC NHANES August 2021-August 2023 (age adjusted):
+#   underweight 1.6%  - CDC Health E-Stat 119, https://www.cdc.gov/nchs/data/hestat/hestat119.htm
+#   overweight 31.7%, obese 40.3%  - CDC Health E-Stat 111, https://www.cdc.gov/nchs/data/hestat/hestat111.htm
+#   normal 26.4%  - not published; the remainder, 100 - 1.6 - 31.7 - 40.3
+# Used to average BMI_RR back to 1 across the population, because the SOA rates already include every BMI.
+BMI_MIX = {"under": 0.016, "normal": 0.264, "over": 0.317, "obese": 0.403}
 LT_BANDS = [(6, "4-6m"), (12, "7-12m"), (24, "13-24m"), (36, "25-36m"), (60, "37-60m"),
             (120, "6-10y"), (180, "11-15y"), (240, "16-20y"), (10**9, "21y+")]
 ELIM_OPTIONS = {1: "30 days", 2: "60 days", 3: "90 days", 6: "180 days", 12: "365 days", 24: "2 years"}

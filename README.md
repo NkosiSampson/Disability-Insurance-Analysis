@@ -64,21 +64,21 @@ Both files are free to download, but they are too large to store on GitHub, so t
 
 The model uses the 2026 rules: 90% of weekly wages up to $1,252.30, otherwise 70%, capped at $1,765 a week, after a 7-day wait, for up to 52 weeks.
 
-### 5. 2026 taxes (for take-home pay)
+### 5. Body mass index (BMI)
+
+- [Shiri, Falah-Hassani and Lallukka (2020), *Body mass index and the risk of disability retirement: a systematic review and meta-analysis*, Occupational and Environmental Medicine](https://pubmed.ncbi.nlm.nih.gov/31467042/): risk multipliers compared with normal weight. Underweight 1.20, overweight 1.13, obese 1.52 (27 studies, about 2.2 million people).
+- [CDC Health E-Stat 111: overweight and obesity among adults, August 2021–August 2023](https://www.cdc.gov/nchs/data/hestat/hestat111.htm): 31.7% overweight and 40.3% obese (adults 20 and older, age adjusted).
+- [CDC Health E-Stat 119: underweight, August 2021–August 2023](https://www.cdc.gov/nchs/data/hestat/hestat119.htm): 1.6% of adults underweight. Normal weight (26.4%) is the remainder.
+
+The SOA rates already include people of every weight, so the model divides each multiplier by the population average (about 1.25, using the CDC shares). On average, the BMI adjustment leaves the SOA rate unchanged. Two limitations: the study measured permanent disability retirement, mostly in European pension systems, while the model applies the multipliers to all new claims; and the CDC shares describe all U.S. adults, while people who buy individual disability insurance are likely healthier than average.
+
+### 6. 2026 taxes (for take-home pay)
 
 - [IRS: 2026 tax brackets and standard deduction](https://www.irs.gov/newsroom/irs-releases-tax-inflation-adjustments-for-tax-year-2026-including-amendments-from-the-one-big-beautiful-bill)
 - [California FTB: 2026 tax rate schedule and standard deduction](https://www.ftb.ca.gov/about-ftb/newsroom/tax-news/2026/10.html)
 - [CalChamber: 2026 Social Security wage base and California SDI payroll rate](https://hrcalifornia.calchamber.com/articles/2026-social-security-taxable-wage-base-california-sdi-withholding-rate-increase)
 
 The model assumes a single filer taking the standard deduction: federal income tax, Social Security (6.2% up to $184,500), Medicare (1.45%, plus 0.9% over $200,000), California income tax and the 1.3% California SDI payroll tax. Outside California, no state income tax is assumed. On $95,000 in California this gives about $70,000 of take-home pay.
-
-### 6. U.S. adult body mass index (BMI) distribution (CDC)
-
-- [CDC Health E-Stat 111: Prevalence of Overweight, Obesity, and Severe Obesity Among Adults Age 20 and Older](https://www.cdc.gov/nchs/data/hestat/hestat111.htm): in August 2021–August 2023, 40.3% of U.S. adults had obesity (BMI 30 or higher) and another 31.7% were overweight (BMI 25 to 29.9), age adjusted. The same figures are in the last row of Table 1.
-- [CDC Health E-Stat 119: Prevalence of Underweight Among Children, Adolescents, and Adults](https://cdc.gov/nchs/data/hestat/hestat119.htm): in the same period, 1.6% of adults were underweight (BMI under 18.5), age adjusted. Also in the last row of Table 2.
-- Normal weight (BMI 18.5 to 24.9) is not published as its own figure; it is the remainder, 100% − 40.3% − 31.7% − 1.6% = 26.4%.
-
-The model stores these, rounded, as `BMI_MIX` in `disability_model.py` (underweight 2%, normal 27%, overweight 31%, obese 40%). The SOA claim rates already reflect a mix of body weights, so the BMI risk multipliers are divided by their average over this mix: an average-BMI person's rate stays at the SOA rate, and only people above or below average move. The obese share (40%) is also used the same way for the death-rate adjustment. The BMI multipliers themselves are assumptions, not fitted from this data.
 
 ## Refit the models from the raw data
 
