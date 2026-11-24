@@ -1,0 +1,46 @@
+variable,level,coefficient,rate_ratio
+Intercept,,-6.66681,
+dur_band,4-6m,0,1.0
+dur_band,1-3m,-0.34534,0.708
+dur_band,7-12m,0.11626,1.1233
+dur_band,13-24m,0.05377,1.0552
+dur_band,25-36m,-0.24965,0.7791
+dur_band,37-60m,-0.61793,0.5391
+dur_band,6-10y,-0.84358,0.4302
+dur_band,11-15y,-0.74995,0.4724
+dur_band,16-20y,-0.47841,0.6198
+dur_band,21y+,0.11178,1.1183
+onset,40-49,0,1.0
+onset,50-59,0.30731,1.3598
+onset,60+,0.45591,1.5776
+onset,<40,-0.43716,0.6459
+sex,Male,0,1.0
+sex,Female,-0.46113,0.6306
+occ_class,1,0,1.0
+occ_class,2,-0.14197,0.8676
+occ_class,3,0.14295,1.1537
+occ_class,4,-0.48626,0.6149
+occ_class,M,-0.22835,0.7958
+benefit,<2500,0,1.0
+benefit,10000-14999,-0.61063,0.543
+benefit,15000-19999,-0.69934,0.4969
+benefit,20000+,-0.86767,0.4199
+benefit,2500-4999,-0.22765,0.7964
+benefit,5000-7499,-0.37514,0.6872
+benefit,7500-9999,-0.44332,0.6419
+diagnosis,Back,0,1.0
+diagnosis,Alcohol & Drug,1.02615,2.7903
+diagnosis,Cancer,2.94893,19.0855
+diagnosis,Circulatory,0.80816,2.2438
+diagnosis,Diabetes,1.13123,3.0995
+diagnosis,Diagnosis Not Provided,1.22224,3.3948
+diagnosis,Digestive,1.22106,3.3908
+diagnosis,Ill-defined and Misc Conditions,0.80911,2.2459
+diagnosis,Infectious Diseases,0.97492,2.651
+diagnosis,Injury Other Than Back,0.13915,1.1493
+diagnosis,Maternity,0.39453,1.4837
+diagnosis,Mental & Nervous,0.45383,1.5743
+diagnosis,Nervous System,0.94257,2.5666
+diagnosis,Other,0.61108,1.8424
+diagnosis,Other Musculoskeletal,-0.25005,0.7788
+diagnosis,Respiratory,1.18899,3.2838

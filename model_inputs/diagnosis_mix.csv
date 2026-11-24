@@ -1,0 +1,16 @@
+diagnosis,male_share,female_share
+Alcohol & Drug,0.0245,0.0093
+Back,0.1234,0.1062
+Cancer,0.1666,0.1972
+Circulatory,0.094,0.0403
+Diabetes,0.0041,0.0018
+Digestive,0.0227,0.019
+Ill-defined and Misc Conditions,0.0156,0.0166
+Infectious Diseases,0.0116,0.0101
+Injury Other Than Back,0.1191,0.1083
+Maternity,0.0006,0.0848
+Mental & Nervous,0.1034,0.0916
+Nervous System,0.0997,0.0828
+Other,0.0691,0.0568
+Other Musculoskeletal,0.1344,0.1639
+Respiratory,0.0112,0.0113
