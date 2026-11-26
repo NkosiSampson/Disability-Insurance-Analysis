@@ -186,11 +186,11 @@ class Policy:
 
 
 # ---------------------------------------------------------------- helpers
-def annual_to_monthly_probability(annual_probability):
+def annual_to_monthly_probability(annual_probability): #checked
     return 1 - (1 - min(annual_probability, 0.99)) ** (1 / 12)
 
 
-def age_band_label(age):
+def age_band_label(age): # checked
     """The incidence model's age band for an age, e.g. 23 -> "<30", 41 -> "40-44"."""
     for band_upper_age, band_label in [(30, "<30"), (35, "30-34"), (40, "35-39"), (45, "40-44"), (50, "45-49"),
                                        (55, "50-54"), (60, "55-59"), (65, "60-64")]:
@@ -318,7 +318,7 @@ def simulate_lives(person: Person, number_of_lives=NUMBER_OF_SIMULATED_LIVES, se
                              * (CHRONIC_CONDITION_DISABILITY_MULTIPLIER if person.has_chronic_condition else 1)
                              * (RISKY_HOBBY_DISABILITY_MULTIPLIER if person.has_risky_hobby else 1))
     smoker_multiplier = SMOKER_DEATH_MULTIPLIER[person.sex]
-    average_smoker_multiplier = 1 - SMOKER_POPULATION_SHARE + SMOKER_POPULATION_SHARE * smoker_multiplier
+    average_smoker_multiplier = 1 - SMOKER_POPULATION_SHARE + SMOKER_POPULATION_SHARE * smoker_multiplier # 1*(share of non-smokers) + multiplier*(share of smokers)
     average_bmi_death_multiplier = sum(BMI_DEATH_MULTIPLIER[group] * BMI_POPULATION_SHARE[group]
                                        for group in BMI_POPULATION_SHARE)
     death_multiplier = ((smoker_multiplier if person.is_smoker else 1) / average_smoker_multiplier
@@ -381,7 +381,7 @@ def simulate_lives(person: Person, number_of_lives=NUMBER_OF_SIMULATED_LIVES, se
                 break
             disability_start, died_while_disabled = disability_time, False
             if random_generator.random() > share_reaching_60_days:
-                disability_length = 1 + random_generator.random()      # ends in month 2
+                disability_length = 1 + random_generator.random()      # ends in month 2 ( when share reahcing 60 days is 0.579, ≈ 0.579: about 58% of disabilities that last past 30 days are still going at 60 days. That leaves 42% that end before 60 days. This number comes from the waiting-period coefficients we just went through.
             elif random_generator.random() > share_reaching_90_days_given_60:
                 disability_length = 2 + random_generator.random()      # ends in month 3
             else:                                           # lasts past month 3: real claim durations
@@ -444,7 +444,7 @@ class MoneyOverTime:
         self.cumulative_discounted_sdi = np.r_[0, np.cumsum(self.monthly_sdi_if_disabled * discount_factor)]
         # income relative to today's income: used when coverage grows with income (future increase option)
         income_growth_ratio = self.monthly_gross_income / (person.current_income / 12)
-        self.cumulative_discounted_income_growth = np.r_[0, np.cumsum(income_growth_ratio * discount_factor)]
+        self.cumulative_discounted_income_growth = np.r_[0, np.cumsum(income_growth_ratio * discount_factor)] # running total of "how much has the person's income grown relative to today," month by month, discounted to today's dollars.
         self.total_income_growth_months = float(np.sum(income_growth_ratio))
 
     def discounted_total_between(self, cumulative, from_month, to_month):
@@ -454,7 +454,7 @@ class MoneyOverTime:
         return np.where(to_month > from_month,
                         np.interp(to_month, month_grid, cumulative) - np.interp(from_month, month_grid, cumulative), 0.0)
 
-    def discounted_months_between(self, from_month, to_month):
+    def discounted_months_between(self, from_month, to_month): # Months of total episode
         """Value today of $1 a month paid between two months."""
         if self.monthly_discount_log_rate == 0:
             return np.maximum(to_month - from_month, 0)
@@ -503,7 +503,7 @@ def policy_results(simulation, person, policy: Policy, no_policy, money):
     benefit_start, benefit_end = start + waiting, start + np.minimum(length, waiting + benefit_period)
     benefits = np.where(policy_pays, money.discounted_months_between(benefit_start, benefit_end) * monthly_benefit, 0.0)
     if policy.reduced_by_sdi and person.lives_in_california:
-        sdi_overlap_end = np.minimum(benefit_end, start + SDI_MAX_MONTHS)
+        sdi_overlap_end = np.minimum(benefit_end, start + SDI_MAX_MONTHS) # when benefits or SDI end
         benefits -= np.where(policy_pays & (sdi_overlap_end > benefit_start),
                              money.discounted_months_between(benefit_start, sdi_overlap_end)
                              * np.minimum(monthly_benefit, money.value_at_month(start, money.monthly_sdi_if_disabled)),
@@ -539,14 +539,10 @@ def years_below_income_floor(simulation, person, policy, money, yearly_income_fl
     All three are tax-free here, so compare them with a take-home floor. policy=None means no policy."""
     start, length = simulation["episode_start_month"], simulation["episode_length_months"]
     episode_life, number_of_lives = simulation["episode_life"], simulation["number_of_lives"]
-    # Which disability of its life each one is (0 = first), so the SSDI approval draw is repeatable
-    disability_number_in_life = np.zeros(len(episode_life), int)
-    for k in range(1, len(episode_life)):
-        if episode_life[k] == episode_life[k - 1]:
-            disability_number_in_life[k] = disability_number_in_life[k - 1] + 1
-    # A fixed pseudo-random number per disability (a hash), so every option sees the same SSDI decisions
-    ssdi_random_number = (((episode_life + 1) * 2654435761 + (2 * disability_number_in_life + 7) * 40503)
-                          % 2**32) / 2**32
+    # One random number per disability for the SSDI approval decision. A fixed seed gives the same numbers on every
+    # call, so no policy and each policy see the same SSDI decisions, and each disability gets its own independent
+    # draw. RANDOM_SEED + 1 keeps these separate from the simulation's own random draws.
+    ssdi_random_number = np.random.default_rng(RANDOM_SEED + 1).random(len(episode_life))
     gets_ssdi = (ssdi_random_number < ssdi_approval_chance) & (length >= SSDI_MIN_DISABILITY_MONTHS)
     monthly_sdi = money.value_at_month(start, money.monthly_sdi_if_disabled)
     waiting = policy.waiting_period_months if policy else PAYS_UNTIL_65
